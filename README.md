@@ -1,0 +1,1 @@
+Om het te starten, voer je dotnet run --project backend/Assessment.Api uit vanuit de hoofdmap van /Assessment in één terminal, en "npm install" (alleen de eerste keer) en daarna "npm start vanuit /Assessment/frontend in een andere terminal. 
