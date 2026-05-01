@@ -1,0 +1,20 @@
+# .NET
+bin/
+obj/
+.vs/
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.history/

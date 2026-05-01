@@ -1,0 +1,38 @@
+<section class="hero">
+  <div class="hero-text">
+    <p class="kicker">AI-gedreven vacaturebord</p>
+    <h1>Bedrijven met actieve vacatures</h1>
+    <p class="subtitle">
+      Alleen bedrijven met minimaal 1 actieve vacature worden hieronder getoond.
+    </p>
+    <a routerLink="/vacatures/nieuw" class="cta">Vacature toevoegen</a>
+  </div>
+</section>
+
+@if (loading()) {
+  <p class="status">Laden...</p>
+} @else if (error()) {
+  <p class="status error">{{ error() }}</p>
+} @else if (companies().length === 0) {
+  <p class="status">Er zijn momenteel geen actieve vacatures.</p>
+} @else {
+  <section class="company-grid">
+    @for (company of companies(); track company.id) {
+      <article class="company-card">
+        <header>
+          <h2>{{ company.name }}</h2>
+          <p>{{ company.address }}</p>
+        </header>
+
+        <div class="vacancy-grid">
+          @for (vacancy of company.vacancies; track vacancy.id) {
+            <div class="vacancy-card">
+              <h3>{{ vacancy.title }}</h3>
+              <p>{{ vacancy.description || 'Geen omschrijving opgegeven.' }}</p>
+            </div>
+          }
+        </div>
+      </article>
+    }
+  </section>
+}

@@ -1,0 +1,95 @@
+:host {
+  display: block;
+}
+
+.hero {
+  border: 1px solid rgba(150, 120, 255, 0.3);
+  background: linear-gradient(140deg, rgba(53, 34, 98, 0.92), rgba(23, 17, 44, 0.94));
+  border-radius: 20px;
+  padding: 2.2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 0 90px rgba(165, 69, 255, 0.25);
+}
+
+.kicker {
+  color: #8f96c9;
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+}
+
+h1 {
+  margin: 0 0 0.8rem;
+  font-size: clamp(1.9rem, 4vw, 3rem);
+}
+
+.subtitle {
+  color: #c8ccf0;
+  margin-bottom: 1.2rem;
+  max-width: 48rem;
+}
+
+.cta {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.75rem 1.35rem;
+  text-decoration: none;
+  color: #03110f;
+  background: linear-gradient(90deg, #00e8f6, #00d9c7);
+  font-weight: 700;
+}
+
+.status {
+  color: #d6daf9;
+}
+
+.error {
+  color: #ff8383;
+}
+
+.company-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.company-card {
+  background: rgba(20, 15, 39, 0.78);
+  border: 1px solid rgba(150, 120, 255, 0.25);
+  border-radius: 18px;
+  padding: 1.2rem;
+}
+
+.company-card h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.company-card header p {
+  margin-top: 0.35rem;
+  color: #9ca3cf;
+}
+
+.vacancy-grid {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.vacancy-card {
+  background: linear-gradient(140deg, rgba(52, 31, 101, 0.55), rgba(23, 16, 45, 0.8));
+  border-radius: 14px;
+  border: 1px solid rgba(150, 120, 255, 0.25);
+  padding: 0.9rem 1rem;
+}
+
+
+.vacancy-card h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.vacancy-card p {
+  color: #b9bee2;
+  margin: 0;
+}
