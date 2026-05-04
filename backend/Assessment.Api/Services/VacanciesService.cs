@@ -10,7 +10,8 @@ public enum VacancyWriteFailure
     None,
     ValidationFailed,
     VacancyNotFound,
-    CompanyNotFound
+    CompanyNotFound,
+    Conflict
 }
 
 public record VacancyWriteResult(VacancyDto? Vacancy, VacancyWriteFailure Failure);
@@ -36,10 +37,8 @@ public class VacanciesService(AssessmentDbContext dbContext) : IVacanciesService
 
     public async Task<VacancyWriteResult> CreateVacancyAsync(VacancyCreateDto request)
     {
-        if (string.IsNullOrWhiteSpace(request.Title))
-        {
-            return new VacancyWriteResult(null, VacancyWriteFailure.ValidationFailed);
-        }
+        var title = request.Title.Trim();
+        var description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
 
         var companyExists = await dbContext.Companies.AnyAsync(c => c.Id == request.CompanyId);
         if (!companyExists)
@@ -47,10 +46,17 @@ public class VacanciesService(AssessmentDbContext dbContext) : IVacanciesService
             return new VacancyWriteResult(null, VacancyWriteFailure.CompanyNotFound);
         }
 
+        var duplicate = await dbContext.Vacancies.AnyAsync(v =>
+            v.CompanyId == request.CompanyId && v.Title == title);
+        if (duplicate)
+        {
+            return new VacancyWriteResult(null, VacancyWriteFailure.Conflict);
+        }
+
         var vacancy = new Vacancy
         {
-            Title = request.Title.Trim(),
-            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+            Title = title,
+            Description = description,
             IsActive = request.IsActive,
             CompanyId = request.CompanyId
         };
@@ -63,10 +69,8 @@ public class VacanciesService(AssessmentDbContext dbContext) : IVacanciesService
 
     public async Task<VacancyWriteResult> UpdateVacancyAsync(int id, VacancyUpdateDto request)
     {
-        if (string.IsNullOrWhiteSpace(request.Title))
-        {
-            return new VacancyWriteResult(null, VacancyWriteFailure.ValidationFailed);
-        }
+        var title = request.Title.Trim();
+        var description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
 
         var vacancy = await dbContext.Vacancies.FirstOrDefaultAsync(v => v.Id == id);
         if (vacancy is null)
@@ -80,8 +84,15 @@ public class VacanciesService(AssessmentDbContext dbContext) : IVacanciesService
             return new VacancyWriteResult(null, VacancyWriteFailure.CompanyNotFound);
         }
 
-        vacancy.Title = request.Title.Trim();
-        vacancy.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
+        var duplicate = await dbContext.Vacancies.AnyAsync(v =>
+            v.Id != id && v.CompanyId == request.CompanyId && v.Title == title);
+        if (duplicate)
+        {
+            return new VacancyWriteResult(null, VacancyWriteFailure.Conflict);
+        }
+
+        vacancy.Title = title;
+        vacancy.Description = description;
         vacancy.IsActive = request.IsActive;
         vacancy.CompanyId = request.CompanyId;
 

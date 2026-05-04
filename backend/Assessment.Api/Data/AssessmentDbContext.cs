@@ -27,5 +27,13 @@ public class AssessmentDbContext(DbContextOptions<AssessmentDbContext> options) 
         modelBuilder.Entity<Vacancy>()
             .Property(v => v.Title)
             .IsRequired();
+
+        modelBuilder.Entity<Company>()
+            .HasIndex(c => new { c.Name, c.Address })
+            .IsUnique();
+
+        modelBuilder.Entity<Vacancy>()
+            .HasIndex(v => new { v.CompanyId, v.Title })
+            .IsUnique();
     }
 }

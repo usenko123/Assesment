@@ -1,5 +1,6 @@
 using Assessment.Api.Dtos;
 using Assessment.Api.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Assessment.Api.Controllers;
@@ -15,7 +16,7 @@ public class VacanciesController(IVacanciesService vacanciesService) : Controlle
         return Ok(vacancies);
     }
 
-    [HttpGet("{id:int}")]
+    [HttpGet("{id:int:min(1)}")]
     public async Task<ActionResult<VacancyDto>> GetVacancy(int id)
     {
         var vacancy = await vacanciesService.GetVacancyAsync(id);
@@ -26,43 +27,56 @@ public class VacanciesController(IVacanciesService vacanciesService) : Controlle
     public async Task<ActionResult<VacancyDto>> CreateVacancy([FromBody] VacancyCreateDto request)
     {
         var result = await vacanciesService.CreateVacancyAsync(request);
-        if (result.Failure == VacancyWriteFailure.ValidationFailed)
+        return result.Failure switch
         {
-            return BadRequest("Titel is verplicht.");
-        }
-
-        if (result.Failure == VacancyWriteFailure.CompanyNotFound)
-        {
-            return BadRequest("Bedrijf bestaat niet.");
-        }
-
-        var response = result.Vacancy!;
-        return CreatedAtAction(nameof(GetVacancy), new { id = response.Id }, response);
+            VacancyWriteFailure.None => CreatedAtAction(nameof(GetVacancy), new { id = result.Vacancy!.Id }, result.Vacancy),
+            VacancyWriteFailure.CompanyNotFound => Problem(
+                title: "Ongeldig bedrijf",
+                detail: "Bedrijf bestaat niet.",
+                statusCode: StatusCodes.Status400BadRequest),
+            VacancyWriteFailure.Conflict => Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Er bestaat al een vacature met deze titel bij dit bedrijf."
+            }),
+            VacancyWriteFailure.ValidationFailed => Problem(
+                title: "Ongeldige aanvraag",
+                detail: "Validatie is mislukt.",
+                statusCode: StatusCodes.Status400BadRequest),
+            _ => Problem(
+                title: "Serverfout",
+                statusCode: StatusCodes.Status500InternalServerError)
+        };
     }
 
-    [HttpPut("{id:int}")]
+    [HttpPut("{id:int:min(1)}")]
     public async Task<ActionResult<VacancyDto>> UpdateVacancy(int id, [FromBody] VacancyUpdateDto request)
     {
         var result = await vacanciesService.UpdateVacancyAsync(id, request);
-        if (result.Failure == VacancyWriteFailure.ValidationFailed)
+        return result.Failure switch
         {
-            return BadRequest("Titel is verplicht.");
-        }
-
-        if (result.Failure == VacancyWriteFailure.VacancyNotFound)
-        {
-            return NotFound();
-        }
-
-        if (result.Failure == VacancyWriteFailure.CompanyNotFound)
-        {
-            return BadRequest("Bedrijf bestaat niet.");
-        }
-
-        return Ok(result.Vacancy);
+            VacancyWriteFailure.None => Ok(result.Vacancy),
+            VacancyWriteFailure.VacancyNotFound => NotFound(),
+            VacancyWriteFailure.CompanyNotFound => Problem(
+                title: "Ongeldig bedrijf",
+                detail: "Bedrijf bestaat niet.",
+                statusCode: StatusCodes.Status400BadRequest),
+            VacancyWriteFailure.Conflict => Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Er bestaat al een vacature met deze titel bij dit bedrijf."
+            }),
+            VacancyWriteFailure.ValidationFailed => Problem(
+                title: "Ongeldige aanvraag",
+                detail: "Validatie is mislukt.",
+                statusCode: StatusCodes.Status400BadRequest),
+            _ => Problem(
+                title: "Serverfout",
+                statusCode: StatusCodes.Status500InternalServerError)
+        };
     }
 
-    [HttpDelete("{id:int}")]
+    [HttpDelete("{id:int:min(1)}")]
     public async Task<IActionResult> DeleteVacancy(int id)
     {
         var deleted = await vacanciesService.DeleteVacancyAsync(id);

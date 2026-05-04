@@ -9,7 +9,8 @@ public enum CompanyWriteFailure
 {
     None,
     ValidationFailed,
-    CompanyNotFound
+    CompanyNotFound,
+    Conflict
 }
 
 public record CompanyWriteResult(CompanyDto? Company, VacancyDto? Vacancy, CompanyWriteFailure Failure);
@@ -63,15 +64,19 @@ public class CompaniesService(AssessmentDbContext dbContext) : ICompaniesService
 
     public async Task<CompanyWriteResult> CreateCompanyAsync(CompanyCreateDto request)
     {
-        if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Address))
+        var name = request.Name.Trim();
+        var address = request.Address.Trim();
+
+        var duplicate = await dbContext.Companies.AnyAsync(c => c.Name == name && c.Address == address);
+        if (duplicate)
         {
-            return new CompanyWriteResult(null, null, CompanyWriteFailure.ValidationFailed);
+            return new CompanyWriteResult(null, null, CompanyWriteFailure.Conflict);
         }
 
         var company = new Company
         {
-            Name = request.Name.Trim(),
-            Address = request.Address.Trim()
+            Name = name,
+            Address = address
         };
 
         dbContext.Companies.Add(company);
@@ -83,10 +88,8 @@ public class CompaniesService(AssessmentDbContext dbContext) : ICompaniesService
 
     public async Task<CompanyWriteResult> UpdateCompanyAsync(int id, CompanyUpdateDto request)
     {
-        if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Address))
-        {
-            return new CompanyWriteResult(null, null, CompanyWriteFailure.ValidationFailed);
-        }
+        var name = request.Name.Trim();
+        var address = request.Address.Trim();
 
         var company = await dbContext.Companies
             .Include(c => c.Vacancies)
@@ -97,8 +100,15 @@ public class CompaniesService(AssessmentDbContext dbContext) : ICompaniesService
             return new CompanyWriteResult(null, null, CompanyWriteFailure.CompanyNotFound);
         }
 
-        company.Name = request.Name.Trim();
-        company.Address = request.Address.Trim();
+        var duplicate = await dbContext.Companies.AnyAsync(c =>
+            c.Id != id && c.Name == name && c.Address == address);
+        if (duplicate)
+        {
+            return new CompanyWriteResult(null, null, CompanyWriteFailure.Conflict);
+        }
+
+        company.Name = name;
+        company.Address = address;
         await dbContext.SaveChangesAsync();
 
         return new CompanyWriteResult(MapCompany(company), null, CompanyWriteFailure.None);
@@ -119,10 +129,8 @@ public class CompaniesService(AssessmentDbContext dbContext) : ICompaniesService
 
     public async Task<CompanyWriteResult> CreateCompanyVacancyAsync(int companyId, CompanyVacancyCreateDto request)
     {
-        if (string.IsNullOrWhiteSpace(request.Title))
-        {
-            return new CompanyWriteResult(null, null, CompanyWriteFailure.ValidationFailed);
-        }
+        var title = request.Title.Trim();
+        var description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description!.Trim();
 
         var companyExists = await dbContext.Companies.AnyAsync(c => c.Id == companyId);
         if (!companyExists)
@@ -130,11 +138,18 @@ public class CompaniesService(AssessmentDbContext dbContext) : ICompaniesService
             return new CompanyWriteResult(null, null, CompanyWriteFailure.CompanyNotFound);
         }
 
+        var duplicateVacancy = await dbContext.Vacancies.AnyAsync(v =>
+            v.CompanyId == companyId && v.Title == title);
+        if (duplicateVacancy)
+        {
+            return new CompanyWriteResult(null, null, CompanyWriteFailure.Conflict);
+        }
+
         var vacancy = new Vacancy
         {
             CompanyId = companyId,
-            Title = request.Title.Trim(),
-            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+            Title = title,
+            Description = description,
             IsActive = request.IsActive
         };
 

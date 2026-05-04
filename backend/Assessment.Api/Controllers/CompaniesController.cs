@@ -1,5 +1,6 @@
 using Assessment.Api.Dtos;
 using Assessment.Api.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Assessment.Api.Controllers;
@@ -15,7 +16,7 @@ public class CompaniesController(ICompaniesService companiesService) : Controlle
         return Ok(companies);
     }
 
-    [HttpGet("{id:int}")]
+    [HttpGet("{id:int:min(1)}")]
     public async Task<ActionResult<CompanyDto>> GetCompany(int id)
     {
         var company = await companiesService.GetCompanyAsync(id);
@@ -33,33 +34,48 @@ public class CompaniesController(ICompaniesService companiesService) : Controlle
     public async Task<ActionResult<CompanyDto>> CreateCompany([FromBody] CompanyCreateDto request)
     {
         var result = await companiesService.CreateCompanyAsync(request);
-        if (result.Failure == CompanyWriteFailure.ValidationFailed)
+        return result.Failure switch
         {
-            return BadRequest("Naam en adres zijn verplicht.");
-        }
-
-        var response = result.Company!;
-        return CreatedAtAction(nameof(GetCompany), new { id = response.Id }, response);
+            CompanyWriteFailure.None => CreatedAtAction(nameof(GetCompany), new { id = result.Company!.Id }, result.Company),
+            CompanyWriteFailure.Conflict => Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Bedrijf met deze naam en adres bestaat al."
+            }),
+            CompanyWriteFailure.ValidationFailed => Problem(
+                title: "Ongeldige aanvraag",
+                detail: "Validatie is mislukt.",
+                statusCode: StatusCodes.Status400BadRequest),
+            _ => Problem(
+                title: "Serverfout",
+                statusCode: StatusCodes.Status500InternalServerError)
+        };
     }
 
-    [HttpPut("{id:int}")]
+    [HttpPut("{id:int:min(1)}")]
     public async Task<ActionResult<CompanyDto>> UpdateCompany(int id, [FromBody] CompanyUpdateDto request)
     {
         var result = await companiesService.UpdateCompanyAsync(id, request);
-        if (result.Failure == CompanyWriteFailure.ValidationFailed)
+        return result.Failure switch
         {
-            return BadRequest("Naam en adres zijn verplicht.");
-        }
-
-        if (result.Failure == CompanyWriteFailure.CompanyNotFound)
-        {
-            return NotFound();
-        }
-
-        return Ok(result.Company);
+            CompanyWriteFailure.None => Ok(result.Company),
+            CompanyWriteFailure.CompanyNotFound => NotFound(),
+            CompanyWriteFailure.Conflict => Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Bedrijf met deze naam en adres bestaat al."
+            }),
+            CompanyWriteFailure.ValidationFailed => Problem(
+                title: "Ongeldige aanvraag",
+                detail: "Validatie is mislukt.",
+                statusCode: StatusCodes.Status400BadRequest),
+            _ => Problem(
+                title: "Serverfout",
+                statusCode: StatusCodes.Status500InternalServerError)
+        };
     }
 
-    [HttpDelete("{id:int}")]
+    [HttpDelete("{id:int:min(1)}")]
     public async Task<IActionResult> DeleteCompany(int id)
     {
         var deleted = await companiesService.DeleteCompanyAsync(id);
@@ -71,21 +87,29 @@ public class CompaniesController(ICompaniesService companiesService) : Controlle
         return NoContent();
     }
 
-    [HttpPost("{companyId:int}/vacancies")]
+    [HttpPost("{companyId:int:min(1)}/vacancies")]
     public async Task<ActionResult<VacancyDto>> CreateCompanyVacancy(int companyId, [FromBody] CompanyVacancyCreateDto request)
     {
         var result = await companiesService.CreateCompanyVacancyAsync(companyId, request);
-        if (result.Failure == CompanyWriteFailure.ValidationFailed)
+        return result.Failure switch
         {
-            return BadRequest("Titel is verplicht.");
-        }
-
-        if (result.Failure == CompanyWriteFailure.CompanyNotFound)
-        {
-            return NotFound("Bedrijf niet gevonden.");
-        }
-
-        var response = result.Vacancy!;
-        return CreatedAtAction(nameof(VacanciesController.GetVacancy), "Vacancies", new { id = response.Id }, response);
+            CompanyWriteFailure.None => CreatedAtAction(nameof(VacanciesController.GetVacancy), "Vacancies", new { id = result.Vacancy!.Id }, result.Vacancy),
+            CompanyWriteFailure.CompanyNotFound => Problem(
+                title: "Niet gevonden",
+                detail: "Bedrijf niet gevonden.",
+                statusCode: StatusCodes.Status404NotFound),
+            CompanyWriteFailure.Conflict => Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Er bestaat al een vacature met deze titel bij dit bedrijf."
+            }),
+            CompanyWriteFailure.ValidationFailed => Problem(
+                title: "Ongeldige aanvraag",
+                detail: "Validatie is mislukt.",
+                statusCode: StatusCodes.Status400BadRequest),
+            _ => Problem(
+                title: "Serverfout",
+                statusCode: StatusCodes.Status500InternalServerError)
+        };
     }
 }
