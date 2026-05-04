@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/backend/Assessment.Api/Assessment.Api.csproj",
+                "${workspaceFolder}/backend/Assessment.sln",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -19,7 +19,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/backend/Assessment.Api/Assessment.Api.csproj",
+                "${workspaceFolder}/backend/src/Assessment.Api/Assessment.Api.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -33,7 +33,7 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/backend/Assessment.Api/Assessment.Api.csproj"
+                "${workspaceFolder}/backend/src/Assessment.Api/Assessment.Api.csproj"
             ],
             "problemMatcher": "$msCompile"
         }

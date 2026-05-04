@@ -1,20 +1,113 @@
-# .NET
-bin/
-obj/
-.vs/
+# ---------------------------------------------------------------------------
+# .NET / Visual Studio / Rider
+# ---------------------------------------------------------------------------
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+[Dd]ebug/
+[Rr]elease/
+[Dd]ebugPublic/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]uild/
+msbuild.log
+msbuild.err
+msbuild.wrn
 
-# Node / Angular
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.rsuser
+
+# Visual Studio cache/options
+.vs/
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+
+# Test / coverage
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.coverage
+*.coveragexml
+coverage/
+*.trx
+
+# Publish output
+[Pp]ublish/
+*.[Pp]ublish.xml
+*.azurePubxml
+PublishScripts/
+
+# EF Core / SQL local files
+*.mdf
+*.ldf
+*.ndf
+
+# ---------------------------------------------------------------------------
+# Node / Angular / Frontend
+# ---------------------------------------------------------------------------
 node_modules/
 dist/
 .angular/
 coverage/
+.npm/
+.pnp.*
+.yarn/cache
+.yarn/install-state.gz
 
+# ---------------------------------------------------------------------------
 # Logs
+# ---------------------------------------------------------------------------
 *.log
 npm-debug.log*
+yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
+# ---------------------------------------------------------------------------
+# Environment / secrets
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pfx
+*.snk
+appsettings.*.local.json
+secrets.json
+
+# ---------------------------------------------------------------------------
 # OS / editor noise
+# ---------------------------------------------------------------------------
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 .history/
+*.swp
+*.tmp

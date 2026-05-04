@@ -1,5 +1,10 @@
 <Solution>
   <Folder Name="/backend/">
-    <Project Path="backend/Assessment.Api/Assessment.Api.csproj" />
+    <Project Path="backend/src/Assessment.Api/Assessment.Api.csproj" />
+    <Project Path="backend/src/Assessment.Application/Assessment.Application.csproj" />
+    <Project Path="backend/src/Assessment.Domain/Assessment.Domain.csproj" />
+    <Project Path="backend/src/Assessment.Infrastructure/Assessment.Infrastructure.csproj" />
+    <Project Path="backend/tests/Assessment.Api.Tests/Assessment.Api.Tests.csproj" />
+    <Project Path="backend/tests/Assessment.Application.Tests/Assessment.Application.Tests.csproj" />
   </Folder>
 </Solution>
