@@ -1,5 +1,5 @@
 import { Component, computed, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { rxResource } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { CompanyService } from '../../services/company.service';
@@ -19,20 +19,27 @@ interface CompanyListState {
 export class CompanyListPageComponent {
   private readonly companyService = inject(CompanyService);
 
-  private readonly state = toSignal<CompanyListState | null>(
-    this.companyService.getWithActiveVacancies().pipe(
-      map(result => ({ companies: result.items, error: null })),
-      catchError(() =>
-        of<CompanyListState>({
-          companies: [],
-          error: 'Kon bedrijven met actieve vacatures niet ophalen.'
-        })
-      )
-    ),
-    { initialValue: null }
-  );
+  private readonly companiesResource = rxResource({
+    stream: () =>
+      this.companyService.getWithActiveVacancies().pipe(
+        map(
+          (result): CompanyListState => ({
+            companies: result.items,
+            error: null
+          })
+        ),
+        catchError(() =>
+          of<CompanyListState>({
+            companies: [],
+            error: 'Kon bedrijven met actieve vacatures niet ophalen.'
+          })
+        )
+      ),
+    defaultValue: { companies: [], error: null } satisfies CompanyListState
+  });
 
-  protected readonly loading = computed(() => this.state() === null);
-  protected readonly companies = computed(() => this.state()?.companies ?? []);
-  protected readonly error = computed(() => this.state()?.error ?? null);
+  /** Distinct from "no rows": stays true across refetches (`reload()`). */
+  protected readonly loading = this.companiesResource.isLoading;
+  protected readonly companies = computed(() => this.companiesResource.value().companies);
+  protected readonly error = computed(() => this.companiesResource.value().error);
 }
