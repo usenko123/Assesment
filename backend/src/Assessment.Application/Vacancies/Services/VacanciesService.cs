@@ -1,4 +1,5 @@
 using Assessment.Application.Abstractions;
+using Assessment.Application.Common;
 using Assessment.Application.Vacancies.Dtos;
 using Assessment.Application.Vacancies.Mapping;
 using Assessment.Domain.Common;
@@ -9,109 +10,134 @@ namespace Assessment.Application.Vacancies.Services;
 
 public class VacanciesService(IAssessmentDbContext dbContext) : IVacanciesService
 {
-    public async Task<IReadOnlyCollection<VacancyDto>> GetVacanciesAsync()
+    private static readonly AppError DuplicateVacancyError = new(
+        AppErrorType.Conflict,
+        Title: "Er bestaat al een vacature met deze titel bij dit bedrijf.");
+
+    private static readonly AppError InvalidCompanyError = new(
+        AppErrorType.BadRequest,
+        Title: "Ongeldig bedrijf",
+        Detail: "Bedrijf bestaat niet.");
+
+    public async Task<PagedResult<VacancyDto>> GetVacanciesAsync(VacancyQuery query, CancellationToken ct = default)
     {
-        return await dbContext.Vacancies
-            .AsNoTracking()
+        var page = new PageQuery(query.Page, query.PageSize);
+
+        var source = dbContext.Vacancies.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var term = query.Search.Trim();
+            source = source.Where(v =>
+                EF.Functions.Like(v.Title, $"%{term}%") ||
+                (v.Description != null && EF.Functions.Like(v.Description, $"%{term}%")));
+        }
+
+        if (query.CompanyId is { } companyId)
+        {
+            source = source.Where(v => v.CompanyId == companyId);
+        }
+
+        if (query.IsActive is { } isActive)
+        {
+            source = source.Where(v => v.IsActive == isActive);
+        }
+
+        var total = await source.CountAsync(ct);
+
+        var items = await source
+            .OrderBy(v => v.Id)
+            .Skip(page.Skip)
+            .Take(page.SafePageSize)
             .Select(v => new VacancyDto(v.Id, v.Title, v.Description, v.IsActive, v.CompanyId))
-            .ToListAsync();
+            .ToListAsync(ct);
+
+        return new PagedResult<VacancyDto>(items, total, page.SafePage, page.SafePageSize);
     }
 
-    public async Task<VacancyDto?> GetVacancyAsync(int id)
+    public async Task<VacancyDto?> GetVacancyAsync(int id, CancellationToken ct = default)
     {
         return await dbContext.Vacancies
             .AsNoTracking()
             .Where(v => v.Id == id)
             .Select(v => new VacancyDto(v.Id, v.Title, v.Description, v.IsActive, v.CompanyId))
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(ct);
     }
 
-    public async Task<Result<VacancyDto>> CreateVacancyAsync(VacancyCreateDto request)
+    public async Task<Result<VacancyDto>> CreateVacancyAsync(VacancyCreateDto request, CancellationToken ct = default)
     {
-        var title = request.Title.Trim();
-        var description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
-
-        var companyExists = await dbContext.Companies.AnyAsync(c => c.Id == request.CompanyId);
+        var companyExists = await dbContext.Companies.AnyAsync(c => c.Id == request.CompanyId, ct);
         if (!companyExists)
         {
-            return Result<VacancyDto>.Fail(new AppError(
-                AppErrorType.BadRequest,
-                Title: "Ongeldig bedrijf",
-                Detail: "Bedrijf bestaat niet."));
-        }
-
-        var duplicate = await dbContext.Vacancies.AnyAsync(v =>
-            v.CompanyId == request.CompanyId && v.Title == title);
-        if (duplicate)
-        {
-            return Result<VacancyDto>.Fail(new AppError(
-                AppErrorType.Conflict,
-                Title: "Er bestaat al een vacature met deze titel bij dit bedrijf."));
+            return Result<VacancyDto>.Fail(InvalidCompanyError);
         }
 
         var vacancy = new Vacancy
         {
-            Title = title,
-            Description = description,
+            Title = request.Title.Trim(),
+            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             IsActive = request.IsActive,
             CompanyId = request.CompanyId
         };
 
         dbContext.Vacancies.Add(vacancy);
-        await dbContext.SaveChangesAsync();
+
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            return Result<VacancyDto>.Fail(DuplicateVacancyError);
+        }
 
         return Result<VacancyDto>.Ok(VacancyMappings.MapVacancy(vacancy));
     }
 
-    public async Task<Result<VacancyDto>> UpdateVacancyAsync(int id, VacancyUpdateDto request)
+    public async Task<Result<VacancyDto>> UpdateVacancyAsync(int id, VacancyUpdateDto request, CancellationToken ct = default)
     {
-        var title = request.Title.Trim();
-        var description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
-
-        var vacancy = await dbContext.Vacancies.FirstOrDefaultAsync(v => v.Id == id);
+        var vacancy = await dbContext.Vacancies.FirstOrDefaultAsync(v => v.Id == id, ct);
         if (vacancy is null)
         {
             return Result<VacancyDto>.Fail(new AppError(AppErrorType.NotFound));
         }
 
-        var companyExists = await dbContext.Companies.AnyAsync(c => c.Id == request.CompanyId);
-        if (!companyExists)
+        if (vacancy.CompanyId != request.CompanyId)
         {
-            return Result<VacancyDto>.Fail(new AppError(
-                AppErrorType.BadRequest,
-                Title: "Ongeldig bedrijf",
-                Detail: "Bedrijf bestaat niet."));
+            var companyExists = await dbContext.Companies.AnyAsync(c => c.Id == request.CompanyId, ct);
+            if (!companyExists)
+            {
+                return Result<VacancyDto>.Fail(InvalidCompanyError);
+            }
         }
 
-        var duplicate = await dbContext.Vacancies.AnyAsync(v =>
-            v.Id != id && v.CompanyId == request.CompanyId && v.Title == title);
-        if (duplicate)
-        {
-            return Result<VacancyDto>.Fail(new AppError(
-                AppErrorType.Conflict,
-                Title: "Er bestaat al een vacature met deze titel bij dit bedrijf."));
-        }
-
-        vacancy.Title = title;
-        vacancy.Description = description;
+        vacancy.Title = request.Title.Trim();
+        vacancy.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
         vacancy.IsActive = request.IsActive;
         vacancy.CompanyId = request.CompanyId;
 
-        await dbContext.SaveChangesAsync();
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            return Result<VacancyDto>.Fail(DuplicateVacancyError);
+        }
 
         return Result<VacancyDto>.Ok(VacancyMappings.MapVacancy(vacancy));
     }
 
-    public async Task<bool> DeleteVacancyAsync(int id)
+    public async Task<bool> DeleteVacancyAsync(int id, CancellationToken ct = default)
     {
-        var vacancy = await dbContext.Vacancies.FindAsync(new object[] { id });
+        var vacancy = await dbContext.Vacancies.FindAsync([id], ct);
         if (vacancy is null)
         {
             return false;
         }
 
         dbContext.Vacancies.Remove(vacancy);
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(ct);
         return true;
     }
 }

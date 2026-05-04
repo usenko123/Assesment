@@ -26,7 +26,7 @@ export class CreateVacancyPageComponent {
 
   private readonly state = toSignal<CompaniesState | null>(
     this.companyService.getAll().pipe(
-      map(companies => ({ companies, error: null })),
+      map(result => ({ companies: result.items, error: null })),
       catchError(() =>
         of<CompaniesState>({
           companies: [],

@@ -21,7 +21,7 @@ export class CompanyListPageComponent {
 
   private readonly state = toSignal<CompanyListState | null>(
     this.companyService.getWithActiveVacancies().pipe(
-      map(companies => ({ companies, error: null })),
+      map(result => ({ companies: result.items, error: null })),
       catchError(() =>
         of<CompanyListState>({
           companies: [],

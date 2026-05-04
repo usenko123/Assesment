@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,6 +7,7 @@ namespace Assessment.Api.Infrastructure;
 
 public sealed class GlobalExceptionHandler(
     IProblemDetailsService problemDetailsService,
+    ProblemDetailsFactory problemDetailsFactory,
     ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(
@@ -14,37 +15,31 @@ public sealed class GlobalExceptionHandler(
         Exception exception,
         CancellationToken cancellationToken)
     {
-        if (exception is not DbUpdateException dbUpdate)
+        var isUniqueViolation = exception is DbUpdateException dbUpdate && IsUniqueViolation(dbUpdate);
+
+        if (!isUniqueViolation)
         {
             logger.LogError(exception, "Unhandled exception");
         }
-        else if (!IsUniqueViolation(dbUpdate))
-        {
-            logger.LogError(dbUpdate, "Database update failed");
-        }
 
-        var (statusCode, title) = exception switch
-        {
-            DbUpdateException ex when IsUniqueViolation(ex)
-                => (StatusCodes.Status409Conflict, "Resource bestaat al."),
-            _ => (StatusCodes.Status500InternalServerError, "Er is iets misgegaan.")
-        };
+        var (statusCode, title) = isUniqueViolation
+            ? (StatusCodes.Status409Conflict, "Resource bestaat al.")
+            : (StatusCodes.Status500InternalServerError, "Er is iets misgegaan.");
 
         httpContext.Response.StatusCode = statusCode;
 
-        await problemDetailsService.WriteAsync(new ProblemDetailsContext
+        var problem = problemDetailsFactory.CreateProblemDetails(
+            httpContext,
+            statusCode: statusCode,
+            title: title,
+            type: $"https://httpstatuses.io/{statusCode}");
+
+        return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
-            ProblemDetails = new ProblemDetails
-            {
-                Status = statusCode,
-                Title = title,
-                Type = $"https://httpstatuses.io/{statusCode}"
-            },
+            ProblemDetails = problem,
             Exception = exception
-        }).ConfigureAwait(false);
-
-        return true;
+        });
     }
 
     private static bool IsUniqueViolation(DbUpdateException ex)

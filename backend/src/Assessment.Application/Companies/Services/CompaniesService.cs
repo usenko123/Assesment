@@ -1,4 +1,5 @@
 using Assessment.Application.Abstractions;
+using Assessment.Application.Common;
 using Assessment.Application.Companies.Dtos;
 using Assessment.Application.Companies.Mapping;
 using Assessment.Application.Vacancies.Dtos;
@@ -11,106 +12,115 @@ namespace Assessment.Application.Companies.Services;
 
 public class CompaniesService(IAssessmentDbContext dbContext) : ICompaniesService
 {
-    public async Task<IReadOnlyCollection<CompanyDto>> GetCompaniesAsync()
+    private static readonly AppError DuplicateCompanyError = new(
+        AppErrorType.Conflict,
+        Title: "Bedrijf met deze naam en adres bestaat al.");
+
+    public async Task<PagedResult<CompanyDto>> GetCompaniesAsync(CompanyQuery query, CancellationToken ct = default)
     {
-        return await dbContext.Companies
-            .AsNoTracking()
-            .SelectCompanyDtos()
-            .ToListAsync();
+        var page = new PageQuery(query.Page, query.PageSize);
+
+        var source = dbContext.Companies.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var term = query.Search.Trim();
+            source = source.Where(c =>
+                EF.Functions.Like(c.Name, $"%{term}%") ||
+                EF.Functions.Like(c.Address, $"%{term}%"));
+        }
+
+        if (query.HasActiveVacancies == true)
+        {
+            source = source.Where(c => c.Vacancies.Any(v => v.IsActive));
+        }
+        else if (query.HasActiveVacancies == false)
+        {
+            source = source.Where(c => !c.Vacancies.Any(v => v.IsActive));
+        }
+
+        var total = await source.CountAsync(ct);
+
+        var items = await source
+            .OrderBy(c => c.Id)
+            .Skip(page.Skip)
+            .Take(page.SafePageSize)
+            .SelectCompanyDtos(query.HasActiveVacancies == true)
+            .ToListAsync(ct);
+
+        return new PagedResult<CompanyDto>(items, total, page.SafePage, page.SafePageSize);
     }
 
-    public async Task<CompanyDto?> GetCompanyAsync(int id)
+    public async Task<CompanyDto?> GetCompanyAsync(int id, CancellationToken ct = default)
     {
         return await dbContext.Companies
             .AsNoTracking()
             .Where(c => c.Id == id)
-            .SelectCompanyDtos()
-            .FirstOrDefaultAsync();
+            .SelectCompanyDtos(activeVacanciesOnly: false)
+            .FirstOrDefaultAsync(ct);
     }
 
-    public async Task<IReadOnlyCollection<CompanyDto>> GetCompaniesWithActiveVacanciesAsync()
+    public async Task<Result<CompanyDto>> CreateCompanyAsync(CompanyCreateDto request, CancellationToken ct = default)
     {
-        return await dbContext.Companies
-            .AsNoTracking()
-            .SelectCompanyDtosWithActiveVacancies()
-            .ToListAsync();
-    }
-
-    public async Task<Result<CompanyDto>> CreateCompanyAsync(CompanyCreateDto request)
-    {
-        var name = request.Name.Trim();
-        var address = request.Address.Trim();
-
-        var duplicate = await dbContext.Companies.AnyAsync(c => c.Name == name && c.Address == address);
-        if (duplicate)
-        {
-            return Result<CompanyDto>.Fail(new AppError(
-                AppErrorType.Conflict,
-                Title: "Bedrijf met deze naam en adres bestaat al."));
-        }
-
         var company = new Company
         {
-            Name = name,
-            Address = address
+            Name = request.Name.Trim(),
+            Address = request.Address.Trim()
         };
 
         dbContext.Companies.Add(company);
-        await dbContext.SaveChangesAsync();
 
-        var response = new CompanyDto(company.Id, company.Name, company.Address, []);
-        return Result<CompanyDto>.Ok(response);
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            return Result<CompanyDto>.Fail(DuplicateCompanyError);
+        }
+
+        return Result<CompanyDto>.Ok(new CompanyDto(company.Id, company.Name, company.Address, []));
     }
 
-    public async Task<Result<CompanyDto>> UpdateCompanyAsync(int id, CompanyUpdateDto request)
+    public async Task<Result<CompanyDto>> UpdateCompanyAsync(int id, CompanyUpdateDto request, CancellationToken ct = default)
     {
-        var name = request.Name.Trim();
-        var address = request.Address.Trim();
-
-        var company = await dbContext.Companies
-            .Include(c => c.Vacancies)
-            .FirstOrDefaultAsync(c => c.Id == id);
-
+        var company = await dbContext.Companies.FirstOrDefaultAsync(c => c.Id == id, ct);
         if (company is null)
         {
             return Result<CompanyDto>.Fail(new AppError(AppErrorType.NotFound));
         }
 
-        var duplicate = await dbContext.Companies.AnyAsync(c =>
-            c.Id != id && c.Name == name && c.Address == address);
-        if (duplicate)
+        company.Name = request.Name.Trim();
+        company.Address = request.Address.Trim();
+
+        try
         {
-            return Result<CompanyDto>.Fail(new AppError(
-                AppErrorType.Conflict,
-                Title: "Bedrijf met deze naam en adres bestaat al."));
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            return Result<CompanyDto>.Fail(DuplicateCompanyError);
         }
 
-        company.Name = name;
-        company.Address = address;
-        await dbContext.SaveChangesAsync();
-
-        return Result<CompanyDto>.Ok(CompanyMappings.MapCompany(company));
+        return Result<CompanyDto>.Ok(new CompanyDto(company.Id, company.Name, company.Address, []));
     }
 
-    public async Task<bool> DeleteCompanyAsync(int id)
+    public async Task<bool> DeleteCompanyAsync(int id, CancellationToken ct = default)
     {
-        var company = await dbContext.Companies.FindAsync(new object[] { id });
+        var company = await dbContext.Companies.FindAsync([id], ct);
         if (company is null)
         {
             return false;
         }
 
         dbContext.Companies.Remove(company);
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(ct);
         return true;
     }
 
-    public async Task<Result<VacancyDto>> CreateCompanyVacancyAsync(int companyId, CompanyVacancyCreateDto request)
+    public async Task<Result<VacancyDto>> CreateCompanyVacancyAsync(int companyId, CompanyVacancyCreateDto request, CancellationToken ct = default)
     {
-        var title = request.Title.Trim();
-        var description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description!.Trim();
-
-        var companyExists = await dbContext.Companies.AnyAsync(c => c.Id == companyId);
+        var companyExists = await dbContext.Companies.AnyAsync(c => c.Id == companyId, ct);
         if (!companyExists)
         {
             return Result<VacancyDto>.Fail(new AppError(
@@ -119,25 +129,26 @@ public class CompaniesService(IAssessmentDbContext dbContext) : ICompaniesServic
                 Detail: "Bedrijf niet gevonden."));
         }
 
-        var duplicateVacancy = await dbContext.Vacancies.AnyAsync(v =>
-            v.CompanyId == companyId && v.Title == title);
-        if (duplicateVacancy)
+        var vacancy = new Vacancy
+        {
+            CompanyId = companyId,
+            Title = request.Title.Trim(),
+            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+            IsActive = request.IsActive
+        };
+
+        dbContext.Vacancies.Add(vacancy);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
         {
             return Result<VacancyDto>.Fail(new AppError(
                 AppErrorType.Conflict,
                 Title: "Er bestaat al een vacature met deze titel bij dit bedrijf."));
         }
-
-        var vacancy = new Vacancy
-        {
-            CompanyId = companyId,
-            Title = title,
-            Description = description,
-            IsActive = request.IsActive
-        };
-
-        dbContext.Vacancies.Add(vacancy);
-        await dbContext.SaveChangesAsync();
 
         return Result<VacancyDto>.Ok(VacancyMappings.MapVacancy(vacancy));
     }

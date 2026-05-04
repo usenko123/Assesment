@@ -13,6 +13,28 @@ export interface Company {
   vacancies: Vacancy[];
 }
 
+export interface PagedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CompanyQuery {
+  search?: string;
+  hasActiveVacancies?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface VacancyQuery {
+  search?: string;
+  companyId?: number;
+  isActive?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
 export interface CreateCompanyVacancyRequest {
   title: string;
   description?: string | null;

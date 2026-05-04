@@ -4,7 +4,7 @@ using Assessment.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddApiLayer();
+builder.Services.AddApiLayer(builder.Configuration);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 

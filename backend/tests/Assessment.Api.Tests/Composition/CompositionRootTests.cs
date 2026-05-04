@@ -1,5 +1,6 @@
 using Assessment.Application;
 using Assessment.Application.Abstractions;
+using Assessment.Application.Companies.Dtos;
 using Assessment.Application.Companies.Services;
 using Assessment.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -23,8 +24,9 @@ public class CompositionRootTests
         await using var scope = provider.CreateAsyncScope();
         var companiesService = scope.ServiceProvider.GetRequiredService<ICompaniesService>();
 
-        var companies = await companiesService.GetCompaniesAsync();
+        var companies = await companiesService.GetCompaniesAsync(new CompanyQuery());
 
-        Assert.Empty(companies);
+        Assert.Empty(companies.Items);
+        Assert.Equal(0, companies.Total);
     }
 }
