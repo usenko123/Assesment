@@ -1,7 +1,8 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { CreateCompanyVacancyRequest, PagedResult, Vacancy, VacancyQuery } from '../models';
+import { PagedResult } from '../../../shared/models/paged-result.model';
+import { CreateCompanyVacancyRequest, Vacancy, VacancyQuery } from '../models/vacancy.model';
 
 @Injectable({ providedIn: 'root' })
 export class VacancyService {

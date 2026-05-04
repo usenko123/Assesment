@@ -3,9 +3,9 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
-import { CompanyService } from '../services/company.service';
-import { VacancyService } from '../services/vacancy.service';
-import { Company } from '../models';
+import { CompanyService } from '../../../companies/services/company.service';
+import { Company } from '../../../companies/models/company.model';
+import { VacancyService } from '../../services/vacancy.service';
 
 interface CompaniesState {
   companies: Company[];

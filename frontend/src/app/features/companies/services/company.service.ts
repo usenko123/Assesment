@@ -1,7 +1,8 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Company, CompanyQuery, PagedResult } from '../models';
+import { PagedResult } from '../../../shared/models/paged-result.model';
+import { Company, CompanyQuery } from '../models/company.model';
 
 @Injectable({ providedIn: 'root' })
 export class CompanyService {

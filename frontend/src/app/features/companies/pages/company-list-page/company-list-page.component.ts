@@ -2,8 +2,8 @@ import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
-import { CompanyService } from '../services/company.service';
-import { Company } from '../models';
+import { CompanyService } from '../../services/company.service';
+import { Company } from '../../models/company.model';
 
 interface CompanyListState {
   companies: Company[];
